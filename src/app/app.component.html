@@ -1,0 +1,107 @@
+<div class="app-container">
+  <!-- Header / Auth Section -->
+  <!-- 1. AUTHENTICATION HEADER -->
+  <header class="glass-header">
+    <div class="logo">AutoSave<span class="version-tag">Angular 18.1</span></div>
+    
+    <div class="auth-controls">
+      <!-- Show login/logout button based on auth status -->
+      <div *ngIf="auth.isAuthenticated(); else guestView" class="user-profile animate-fade-in">
+        <div class="avatar">{{ auth.userData()?.name?.[0] || 'U' }}</div>
+        <div class="user-info">
+          <span class="user-name">{{ auth.userData()?.name }}</span>
+          <span class="token-id">Token: {{ auth.getToken() | slice:0:15 }}...</span>
+        </div>
+        <button (click)="logout()" class="btn btn-outline">Logout</button>
+      </div>
+      <ng-template #guestView>
+        <button (click)="login()" class="btn btn-primary animate-pulse">Login (Mock OIDC)</button>
+      </ng-template>
+    </div>
+  </header>
+
+  <main class="content-area">
+    <!-- 2. STATUS BANNER -->
+    <!-- DYNAMIC STATUS BARS: Shows current save/conflict/offline state -->
+    <div class="status-bar" [ngClass]="saveStatus()">
+      <div class="status-content">
+        <span class="status-icon" [ngSwitch]="saveStatus()">
+          <i *ngSwitchCase="'IDLE'">⏸️</i>
+          <i *ngSwitchCase="'SAVING'" class="spinner">⏳</i>
+          <i *ngSwitchCase="'SAVED'">✅</i>
+          <i *ngSwitchCase="'CONFLICT'">⚠️</i>
+          <i *ngSwitchCase="'OFFLINE'">📶❌</i>
+          <i *ngSwitchCase="'ERROR'">❌</i>
+        </span>
+        <span class="status-text">
+          <ng-container [ngSwitch]="saveStatus()">
+            <span *ngSwitchCase="'IDLE'">Waiting for changes...</span>
+            <span *ngSwitchCase="'SAVING'">Auto-saving to server...</span>
+            <span *ngSwitchCase="'SAVED'">Last saved at {{ lastSavedAt() | date:'HH:mm:ss' }}</span>
+            <span *ngSwitchCase="'CONFLICT'">Concurrency Conflict Detected!</span>
+            <span *ngSwitchCase="'OFFLINE'">Offline: No connection...</span>
+            <span *ngSwitchCase="'ERROR'">Error: {{ errorMessage() || 'Failed to save.' }}</span>
+          </ng-container>
+        </span>
+      </div>
+      
+      <!-- ACTION BUTTONS: Appear contextually (e.g. resolve conflict or retry sync) -->
+      <div class="conflict-actions" *ngIf="saveStatus() === 'CONFLICT'">
+        <button (click)="resolveConflict('RELOAD')" class="btn btn-sm btn-warn">Reload Server Data</button>
+        <button (click)="resolveConflict('OVERWRITE')" class="btn btn-sm btn-danger">Overwrite Server</button>
+      </div>
+
+      <div class="conflict-actions" *ngIf="saveStatus() === 'OFFLINE'">
+        <button (click)="retrySync()" class="btn btn-sm btn-sync">Try Re-Sync</button>
+      </div>
+    </div>
+
+    <!-- The Form Card -->
+    <div class="card glass-card animate-slide-up">
+      <form [formGroup]="form" class="auto-save-form">
+        <div class="form-group">
+          <label for="title">Document Title</label>
+          <input 
+            id="title" 
+            type="text" 
+            formControlName="title" 
+            placeholder="Enter title..."
+            class="form-input"
+            [readonly]="!auth.isAuthenticated()"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="content">Content Body</label>
+          <textarea 
+            id="content" 
+            formControlName="content" 
+            placeholder="Start typing your ideas here..."
+            class="form-input textarea"
+            rows="10"
+            [readonly]="!auth.isAuthenticated()"
+          ></textarea>
+        </div>
+
+        <div class="form-footer">
+          <span class="version-counter">Client v{{ currentVersion }} | Server v{{ storage.currentServerVersion() }}</span>
+        </div>
+      </form>
+
+      <!-- Simulation Controls -->
+      <div class="sim-controls" *ngIf="auth.isAuthenticated()">
+        <p class="sim-hint">Simulate what happens when another user edits this document while you are typing.</p>
+        <button (click)="simulateConflict()" class="btn btn-secondary">
+          Simulate Stakeholder Change (Increment Server v)
+        </button>
+        <button (click)="toggleOffline()" class="btn btn-secondary" [class.active-offline]="storage.isSimulatedOffline()">
+          {{ storage.isSimulatedOffline() ? 'Restore Internet' : 'Cut Internet' }}
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer">
+    <p>Built with Angular 18.1 & RxJS Debounce Pattern</p>
+  </footer>
+</div>
