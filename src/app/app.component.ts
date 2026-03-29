@@ -50,8 +50,8 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Initial data load
-    this.loadData();
+    // We no longer call loadData() here because we want to wait for login.
+    // If we had persistent auth (e.g. cookie), we would check it here.
 
     // --- AUTO-SAVE ENGINE ---
     // Listen to every keystroke/change in the form
@@ -117,12 +117,21 @@ export class AppComponent implements OnInit {
   }
 
   login() {
-    this.auth.login().subscribe();
+    this.auth.login().subscribe(() => {
+      // SUCCESS: Fetch the data once the user is authenticated.
+      this.loadData();
+    });
   }
 
   logout() {
     this.auth.logout();
     this.saveStatus.set('IDLE');
+    
+    // CLEAR STATE: Reset the form and metadata
+    this.form.reset({ title: '', content: '' }, { emitEvent: false });
+    this.currentVersion = 1;
+    this.lastSavedAt.set(null);
+    this.errorMessage.set(null);
   }
 
   simulateConflict() {
