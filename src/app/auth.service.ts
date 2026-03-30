@@ -25,22 +25,23 @@ export class AuthService {
   isAuthenticated = signal(false);
   userData = signal<UserProfile | null>(null);
 
-  login() {
-    // SIMULATED LOGIN: In a real app, this would redirect to an OIDC Identity Provider (like Auth0, Azure AD).
-    // The delay mimics the network redirect/handshake.
+  login(userIndex: number = 0) {
+    const mockUsers: UserProfile[] = [
+      { name: 'Demo User', email: 'user@example.com', sub: '1' },
+      { name: 'Alice', email: 'alice@example.com', sub: '2' },
+      { name: 'Bob', email: 'bob@example.com', sub: '3' }
+    ];
+
+    const selectedUser = mockUsers[userIndex] || mockUsers[0];
+
     return of(true).pipe(
-      delay(800),
+      delay(500),
       tap(() => {
-        const mockUser: UserProfile = {
-          name: 'Demo User',
-          email: 'user@example.com',
-          sub: '12345' // Unique Subject ID from the Identity Provider
-        };
         // Update both the Observable and the Signal states
         this._isAuthenticated.next(true);
-        this._userData.next(mockUser);
+        this._userData.next(selectedUser);
         this.isAuthenticated.set(true);
-        this.userData.set(mockUser);
+        this.userData.set(selectedUser);
       })
     );
   }

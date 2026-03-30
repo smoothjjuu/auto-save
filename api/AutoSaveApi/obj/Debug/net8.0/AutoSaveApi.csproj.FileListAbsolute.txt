@@ -30,3 +30,4 @@ C:\Users\44730\projects\auto-save\api\AutoSaveApi\bin\Debug\net8.0\Swashbuckle.A
 C:\Users\44730\projects\auto-save\api\AutoSaveApi\obj\Debug\net8.0\AutoSaveApi.csproj.AssemblyReference.cache
 C:\Users\44730\projects\auto-save\api\AutoSaveApi\obj\Debug\net8.0\AutoSaveApi.MvcApplicationPartsAssemblyInfo.cs
 C:\Users\44730\projects\auto-save\api\AutoSaveApi\obj\Debug\net8.0\AutoSaveApi.csproj.CopyComplete
+C:\Users\44730\projects\auto-save\api\AutoSaveApi\obj\Debug\net8.0\AutoSaveApi.sourcelink.json

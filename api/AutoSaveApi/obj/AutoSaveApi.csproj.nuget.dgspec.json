@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj": {}
+    "C:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj": {}
   },
   "projects": {
-    "c:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj": {
+    "C:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj",
+        "projectUniqueName": "C:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj",
         "projectName": "AutoSaveApi",
-        "projectPath": "c:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj",
+        "projectPath": "C:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\AutoSaveApi.csproj",
         "packagesPath": "C:\\Users\\44730\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\obj\\",
+        "outputPath": "C:\\Users\\44730\\projects\\auto-save\\api\\AutoSaveApi\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\44730\\AppData\\Roaming\\NuGet\\NuGet.Config"

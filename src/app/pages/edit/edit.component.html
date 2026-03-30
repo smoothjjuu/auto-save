@@ -1,0 +1,79 @@
+<div class="edit-view-container animate-fade-in">
+  <div class="navigation-bar">
+    <button (click)="goBack()" class="btn btn-outline btn-sm">← Back to List</button>
+  </div>
+
+  <div class="status-bar" [ngClass]="saveStatus()">
+    <div class="status-content">
+      <span class="status-icon" [ngSwitch]="saveStatus()">
+        <i *ngSwitchCase="'IDLE'">⏸️</i>
+        <i *ngSwitchCase="'SAVING'" class="spinner">⏳</i>
+        <i *ngSwitchCase="'SAVED'">✅</i>
+        <i *ngSwitchCase="'CONFLICT'">⚠️</i>
+        <i *ngSwitchCase="'OFFLINE'">📶❌</i>
+        <i *ngSwitchCase="'ERROR'">❌</i>
+      </span>
+      <span class="status-text">
+        <ng-container [ngSwitch]="saveStatus()">
+          <span *ngSwitchCase="'IDLE'">{{ auth.isAuthenticated() ? 'Waiting for changes...' : 'Login to enable auto-save' }}</span>
+          <span *ngSwitchCase="'SAVING'">Auto-saving to server...</span>
+          <span *ngSwitchCase="'SAVED'">Last saved at {{ lastSavedAt() | date:'HH:mm:ss' }}</span>
+          <span *ngSwitchCase="'CONFLICT'">Concurrency Conflict Detected!</span>
+          <span *ngSwitchCase="'OFFLINE'">Offline: No connection...</span>
+          <span *ngSwitchCase="'ERROR'">Error: {{ errorMessage() || 'Failed to save.' }}</span>
+        </ng-container>
+      </span>
+    </div>
+    
+    <div class="conflict-actions" *ngIf="saveStatus() === 'CONFLICT'">
+      <button (click)="resolveConflict('RELOAD')" class="btn btn-sm btn-warn">Reload Server Data</button>
+      <button (click)="resolveConflict('OVERWRITE')" class="btn btn-sm btn-danger">Overwrite Server</button>
+    </div>
+
+    <div class="conflict-actions" *ngIf="saveStatus() === 'OFFLINE'">
+      <button (click)="retrySync()" class="btn btn-sm btn-sync">Try Re-Sync</button>
+    </div>
+  </div>
+
+  <div class="card glass-card animate-slide-up">
+    <form [formGroup]="form" class="auto-save-form">
+      <div class="form-group">
+        <label for="title">Document Title</label>
+        <input 
+          id="title" 
+          type="text" 
+          formControlName="title" 
+          placeholder="Enter title..."
+          class="form-input"
+          [readonly]="!auth.isAuthenticated()"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="content">Content Body</label>
+        <textarea 
+          id="content" 
+          formControlName="content" 
+          placeholder="Start typing your ideas here..."
+          class="form-input textarea"
+          rows="10"
+          [readonly]="!auth.isAuthenticated()"
+        ></textarea>
+      </div>
+
+      <div class="form-footer">
+        <span class="version-counter">Client v{{ currentVersion }} | Server v{{ storage.currentServerVersion() }}</span>
+      </div>
+    </form>
+
+    <div class="sim-controls" *ngIf="auth.isAuthenticated()">
+      <p class="sim-hint">Simulate what happens when another user edits this document while you are typing.</p>
+      <button (click)="simulateConflict()" class="btn btn-secondary">
+        Simulate Stakeholder Change (Increment Server v)
+      </button>
+      <button (click)="toggleOffline()" class="btn btn-secondary" [class.active-offline]="storage.isSimulatedOffline()">
+        {{ storage.isSimulatedOffline() ? 'Restore Internet' : 'Cut Internet' }}
+      </button>
+    </div>
+  </div>
+</div>
