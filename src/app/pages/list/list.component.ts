@@ -1,9 +1,10 @@
 import { Component, OnInit, inject, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { interval, takeUntil, Subject } from 'rxjs';
+import { interval, takeUntil, Subject, merge } from 'rxjs';
 import { StorageService } from '../../storage.service';
 import { AuthService } from '../../auth.service';
+import { SignalRService } from '../../signalr.service';
 
 @Component({
   selector: 'app-list',
@@ -13,9 +14,14 @@ import { AuthService } from '../../auth.service';
     <div class="list-container animate-fade-in">
       <div class="list-header">
         <h1>Your Forms</h1>
-        <button (click)="createNew()" class="btn btn-primary" [disabled]="!auth.isAuthenticated()">
-          + Create New Form
-        </button>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="connection-status" [class.connected]="signalR.connectionStatus() === 'CONNECTED'">
+            {{ signalR.connectionStatus() === 'CONNECTED' ? '🟢 Live' : '🔴 Reconnecting...' }}
+          </div>
+          <button (click)="createNew()" class="btn btn-primary" [disabled]="!auth.isAuthenticated()">
+            + Create New Form
+          </button>
+        </div>
       </div>
 
       <div class="documents-grid" *ngIf="documents().length > 0; else emptyState">
@@ -105,6 +111,8 @@ import { AuthService } from '../../auth.service';
     .disabled-opacity { cursor: not-allowed !important; opacity: 0.1 !important; }
     .delete-wrapper { position: relative; z-index: 10; }
     .btn-delete:hover:not(:disabled) { opacity: 1; background: rgba(239, 68, 68, 0.1); }
+    .connection-status { font-size: 0.65rem; color: var(--text-dim); margin-top: 0.5rem; text-align: right; }
+    .connection-status.connected { color: var(--success); }
     .empty-state { text-align: center; padding: 4rem; color: var(--text-dim); background: rgba(0,0,0,0.2); border-radius: 1rem; }
   `]
 })
@@ -112,6 +120,7 @@ export class ListComponent implements OnInit, OnDestroy {
   private storage = inject(StorageService);
   private router = inject(Router);
   public auth = inject(AuthService);
+  public signalR = inject(SignalRService);
 
   documents = signal<any[]>([]);
   private destroy$ = new Subject<void>();
@@ -119,11 +128,15 @@ export class ListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadList();
     
-    // --- AUTO-POLL: REFRESH LIST EVERY 10 SECONDS ---
-    interval(10000).pipe(
+    // --- REAL-TIME UPDATES VIA SIGNALR ---
+    merge(
+      this.signalR.documentCreated$,
+      this.signalR.documentDeleted$,
+      this.signalR.lockChanged$
+    ).pipe(
       takeUntil(this.destroy$)
     ).subscribe(() => {
-      console.log('[ListComponent] Polling for updates...');
+      console.log('[ListComponent] SignalR update received! Refreshing list...');
       this.loadList();
     });
   }
@@ -167,7 +180,12 @@ export class ListComponent implements OnInit, OnDestroy {
           console.log(`[ListComponent] Delete successful.`);
           this.loadList(); 
         },
-        error: (err) => console.error('[ListComponent] Delete failed', err)
+        error: (err) => {
+          console.error('[ListComponent] Delete failed', err);
+          const msg = err.error?.message || 'Cannot delete: Document is locked by another user.';
+          alert(msg);
+          this.loadList(); // Refresh to catch latest lock status
+        }
       });
     }
   }

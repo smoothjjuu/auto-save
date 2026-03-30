@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged, switchMap, catchError, of, tap, Subject, takeUntil, interval } from 'rxjs';
 import { StorageService } from '../../storage.service';
 import { AuthService } from '../../auth.service';
+import { SignalRService } from '../../signalr.service';
 
 @Component({
   selector: 'app-edit',
@@ -19,6 +20,7 @@ export class EditComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   public storage = inject(StorageService);
   public auth = inject(AuthService);
+  public signalR = inject(SignalRService);
 
   form: FormGroup;
   docId: string | null = null;
@@ -51,6 +53,18 @@ export class EditComponent implements OnInit, OnDestroy {
        if (this.docId) {
          this.loadData(this.docId);
        }
+    });
+
+    // --- SIGNALR: INSTANT CONFLICT DETECTION ---
+    this.signalR.documentUpdated$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(update => {
+      if (update.id === this.docId && update.user !== this.auth.userData()?.name) {
+        if (update.version > this.currentVersion) {
+           console.log(`[EditComponent] External update detected! v${update.version} > v${this.currentVersion}`);
+           this.saveStatus.set('CONFLICT');
+        }
+      }
     });
 
     if (!this.auth.isAuthenticated()) {
@@ -96,12 +110,17 @@ export class EditComponent implements OnInit, OnDestroy {
             this.lastSavedAt.set(new Date());
           }),
           catchError((err) => {
+            console.error('[EditComponent] Save error:', err);
             if (err.status === 423) {
-              this.saveStatus.set('CONFLICT');
-              this.errorMessage.set(err.error?.message || 'Document is locked by another user.');
+              const serverMsg = err.error?.message || 'locked by another user';
+              const fullMsg = `Failed to save: ${serverMsg}`;
+              this.saveStatus.set('ERROR');
+              this.errorMessage.set(fullMsg);
+              alert(fullMsg);
             } else if (err.status === 404) {
               this.saveStatus.set('ERROR');
               this.errorMessage.set('The document was deleted by another user.');
+              alert('The document was deleted by another user.');
               setTimeout(() => this.router.navigate(['/']), 3000);
             } else if (err.message === '409 Conflict') {
               this.saveStatus.set('CONFLICT');
@@ -109,6 +128,7 @@ export class EditComponent implements OnInit, OnDestroy {
               this.saveStatus.set('OFFLINE');
             } else {
               this.saveStatus.set('ERROR');
+              this.errorMessage.set(err.error?.message || err.message || 'Failed to save.');
             }
             return of(null);
           })

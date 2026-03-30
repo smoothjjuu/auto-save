@@ -85,9 +85,7 @@ export class StorageService {
           }
           return throwError(() => new Error('409 Conflict'));
         }
-        if (err.status === 423) {
-          return throwError(() => new Error(err.error?.message || 'Locked'));
-        }
+        // Return raw error so status and message are preserved
         return throwError(() => err);
       })
     );
