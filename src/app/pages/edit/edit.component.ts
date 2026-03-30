@@ -29,6 +29,7 @@ export class EditComponent implements OnInit, OnDestroy {
   saveStatus = signal<'IDLE' | 'SAVING' | 'SAVED' | 'CONFLICT' | 'OFFLINE' | 'ERROR'>('IDLE');
   lastSavedAt = signal<Date | null>(null);
   errorMessage = signal<string | null>(null);
+  hasLocalDraft = signal<boolean>(false);
 
   private destroy$ = new Subject<void>();
 
@@ -50,7 +51,9 @@ export class EditComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
        this.docId = params['id'];
-       if (this.docId) {
+       if (this.docId && this.auth.isAuthenticated()) {
+         this.checkForLocalDraft(this.docId);
+       } else if (this.docId) {
          this.loadData(this.docId);
        }
     });
@@ -102,7 +105,7 @@ export class EditComponent implements OnInit, OnDestroy {
         }
       }),
       switchMap((value) => {
-        if (!this.auth.isAuthenticated() || !this.docId) return of(null);
+        if (!this.auth.isAuthenticated() || !this.docId || this.hasLocalDraft()) return of(null);
         return this.storage.saveData(this.docId, value, this.currentVersion).pipe(
           tap((result: any) => {
             this.currentVersion = result.version;
@@ -150,12 +153,55 @@ export class EditComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        if (err.status === 404) {
-          alert('This document no longer exists.');
-        }
-        this.router.navigate(['/']);
+        console.error('[EditComponent] Load error:', err);
+        this.saveStatus.set('ERROR');
+        this.errorMessage.set('Failed to load document from server.');
       }
     });
+  }
+
+  private checkForLocalDraft(id: string) {
+    const draft = this.storage.getLocalCache(id);
+    if (draft) {
+      this.hasLocalDraft.set(true);
+      this.saveStatus.set('IDLE');
+    } else {
+      this.loadData(id);
+    }
+  }
+
+  restoreDraft() {
+    if (!this.docId || !this.auth.isAuthenticated()) return;
+    const draft = this.storage.getLocalCache(this.docId);
+    if (draft) {
+      this.form.patchValue(draft.data, { emitEvent: false });
+      this.currentVersion = draft.version;
+      this.hasLocalDraft.set(false);
+      this.saveStatus.set('SAVING');
+      this.errorMessage.set('Restoring and syncing to server...');
+
+      // Trigger immediate sync to server
+      this.storage.saveData(this.docId, draft.data, this.currentVersion).subscribe({
+        next: (result: any) => {
+          this.currentVersion = result.version;
+          this.saveStatus.set('SAVED');
+          this.lastSavedAt.set(new Date());
+          this.errorMessage.set('Successfully restored and synced.');
+        },
+        error: (err) => {
+          console.error('[EditComponent] Sync error after restore:', err);
+          this.saveStatus.set('ERROR');
+          this.errorMessage.set('Restored locally, but failed to sync to server.');
+        }
+      });
+    }
+  }
+
+  discardDraft() {
+    if (!this.docId) return;
+    this.storage.clearLocalCache(this.docId);
+    this.hasLocalDraft.set(false);
+    this.loadData(this.docId);
   }
 
   goBack() {

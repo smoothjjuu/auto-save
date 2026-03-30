@@ -19,7 +19,7 @@
           <span *ngSwitchCase="'SAVING'">Auto-saving to server...</span>
           <span *ngSwitchCase="'SAVED'">Last saved at {{ lastSavedAt() | date:'HH:mm:ss' }}</span>
           <span *ngSwitchCase="'CONFLICT'">Concurrency Conflict Detected!</span>
-          <span *ngSwitchCase="'OFFLINE'">Offline: No connection...</span>
+          <span *ngSwitchCase="'OFFLINE'">Offline: Saved to local storage.</span>
           <span *ngSwitchCase="'ERROR'">Error: {{ errorMessage() || 'Failed to save.' }}</span>
         </ng-container>
       </span>
@@ -28,6 +28,12 @@
     <div class="conflict-actions" *ngIf="saveStatus() === 'CONFLICT'">
       <button (click)="resolveConflict('RELOAD')" class="btn btn-sm btn-warn">Reload Server Data</button>
       <button (click)="resolveConflict('OVERWRITE')" class="btn btn-sm btn-danger">Overwrite Server</button>
+    </div>
+
+    <div class="conflict-actions" *ngIf="hasLocalDraft()">
+      <span class="prompt-text">💾 Local version found! Restore it?</span>
+      <button (click)="restoreDraft()" class="btn btn-sm btn-primary">Restore Draft</button>
+      <button (click)="discardDraft()" class="btn btn-sm btn-outline">Discard</button>
     </div>
 
     <div class="conflict-actions" *ngIf="saveStatus() === 'OFFLINE'">

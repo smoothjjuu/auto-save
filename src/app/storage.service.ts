@@ -62,8 +62,11 @@ export class StorageService {
     );
   }
 
-  // --- UPDATED: SAVE SPECIFIC DOCUMENT ---
+  // --- UPDATED: SAVE SPECIFIC DOCUMENT (With Local Fallback) ---
   saveData(id: string, data: FormData, clientVersion: number): Observable<{ version: number }> {
+    // 1. ALWAYS cache locally first as a "Safety Net"
+    this.saveToLocalCache(id, data, clientVersion);
+
     if (this.isSimulatedOffline()) {
       return of(null).pipe(
         delay(800),
@@ -77,6 +80,8 @@ export class StorageService {
     return this.http.put<any>(`${this.API_URL}/documents/${id}?userName=${userName}`, payload).pipe(
       tap((res: any) => {
         this.currentServerVersion.set(res.version);
+        // 2. Clear local cache ONLY after successful server sync
+        this.clearLocalCache(id);
       }),
       catchError(err => {
         if (err.status === 409) {
@@ -85,10 +90,57 @@ export class StorageService {
           }
           return throwError(() => new Error('409 Conflict'));
         }
-        // Return raw error so status and message are preserved
         return throwError(() => err);
       })
     );
+  }
+
+  // --- LOCAL CACHE HELPERS ---
+  private getCacheKey(id: string): string {
+    const user = this.auth.userData()?.name || 'guest';
+    return `${user}_draft_${id}`;
+  }
+
+  saveToLocalCache(id: string, data: FormData, version: number) {
+    const cacheData = { data, version, timestamp: new Date().getTime() };
+    localStorage.setItem(this.getCacheKey(id), JSON.stringify(cacheData));
+    console.log(`[StorageService] Cached ${id} locally v${version}`);
+  }
+
+  getLocalCache(id: string): { data: FormData, version: number, timestamp: number } | null {
+    const raw = localStorage.getItem(this.getCacheKey(id));
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  clearLocalCache(id: string) {
+    localStorage.removeItem(this.getCacheKey(id));
+    console.log(`[StorageService] Cleared local cache for ${id}`);
+  }
+
+  getAllLocalDrafts(): any[] {
+    const drafts: any[] = [];
+    const currentUser = this.auth.userData()?.name;
+    if (!currentUser) return [];
+
+    const prefix = `${currentUser}_draft_`;
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix)) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          drafts.push({
+            id: key.replace(prefix, ''),
+            title: draft.data.title,
+            hasDraft: true,
+            isLocked: false,
+            lockedBy: null
+          });
+        }
+      }
+    }
+    return drafts;
   }
 
   // --- HEARTBEAT: RENEW LOCK ---
@@ -107,8 +159,13 @@ export class StorageService {
 
   // --- DELETE DOCUMENT ---
   deleteDocument(id: string): Observable<any> {
+    if (this.isSimulatedOffline()) {
+      return throwError(() => new Error('Network Error'));
+    }
     const userName = this.auth.userData()?.name || '';
-    return this.http.delete<any>(`${this.API_URL}/documents/${id}?userName=${userName}`);
+    return this.http.delete<any>(`${this.API_URL}/documents/${id}?userName=${userName}`).pipe(
+      tap(() => this.clearLocalCache(id)) // Clean up local draft if deleted on server
+    );
   }
 
   // Simulation helpers

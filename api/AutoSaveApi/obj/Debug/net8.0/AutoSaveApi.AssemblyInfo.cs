@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AutoSaveApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+545d2a579b1a9a8563a791ef7a1ea8fc8c830d02")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+da1dd47601503423a642686b29d0338cac4d3716")]
 [assembly: System.Reflection.AssemblyProductAttribute("AutoSaveApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AutoSaveApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

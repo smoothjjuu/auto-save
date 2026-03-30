@@ -15,7 +15,10 @@ import { SignalRService } from '../../signalr.service';
       <div class="list-header">
         <h1>Your Forms</h1>
         <div style="display: flex; align-items: center; gap: 1rem;">
-          <div class="connection-status" [class.connected]="signalR.connectionStatus() === 'CONNECTED'">
+          <div class="connection-status" *ngIf="isOfflineMode()" style="color: #f87171;">
+             ⚠️ Server unreachable. Showing offline drafts.
+          </div>
+          <div class="connection-status" [class.connected]="signalR.connectionStatus() === 'CONNECTED'" *ngIf="!isOfflineMode()">
             {{ signalR.connectionStatus() === 'CONNECTED' ? '🟢 Live' : '🔴 Reconnecting...' }}
           </div>
           <button (click)="createNew()" class="btn btn-primary" [disabled]="!auth.isAuthenticated()">
@@ -25,13 +28,19 @@ import { SignalRService } from '../../signalr.service';
       </div>
 
       <div class="documents-grid" *ngIf="documents().length > 0; else emptyState">
-        <div *ngFor="let doc of documents()" class="doc-card" (click)="openDoc(doc.id)">
-          <div class="doc-icon">📄</div>
+        <div *ngFor="let doc of documents()" 
+             class="doc-card" 
+             [class.has-draft]="doc.hasDraft"
+             (click)="openDoc(doc.id)">
+          <div class="doc-icon">{{ doc.hasDraft ? '💾' : '📄' }}</div>
           <div class="doc-info">
-            <span class="doc-title">{{ doc.title }}</span>
+            <span class="doc-title">
+              {{ doc.title }}
+              <span *ngIf="doc.hasDraft" class="draft-tag">DRAFT</span>
+            </span>
             <div class="doc-meta">
               <span class="doc-id">ID: {{ doc.id | slice:0:8 }}...</span>
-              <span *ngIf="doc.isLocked" class="lock-badge" [title]="'Locked by ' + doc.lockedBy">
+              <span *ngIf="doc.isLocked && doc.lockedBy !== auth.userData()?.name" class="lock-badge" [title]="'Locked by ' + doc.lockedBy">
                 🔒 Locked by {{ doc.lockedBy }}
               </span>
             </div>
@@ -79,9 +88,24 @@ import { SignalRService } from '../../signalr.service';
       transform: translateY(-2px);
       border-color: var(--primary);
     }
+    .doc-card.has-draft {
+      border-color: #a855f7; /* Purple border */
+      background: rgba(168, 85, 247, 0.05);
+    }
+    .doc-card.has-draft:hover {
+      background: rgba(168, 85, 247, 0.1);
+    }
     .doc-icon { font-size: 1.5rem; }
     .doc-info { display: flex; flex-direction: column; flex-grow: 1; }
-    .doc-title { font-weight: 600; color: white; }
+    .doc-title { font-weight: 600; color: white; display: flex; align-items: center; gap: 0.5rem; }
+    .draft-tag {
+      font-size: 0.5rem;
+      background: #a855f7;
+      color: white;
+      padding: 0.1rem 0.3rem;
+      border-radius: 0.2rem;
+      font-weight: 800;
+    }
     .doc-id { font-size: 0.7rem; color: var(--text-dim); }
     .doc-arrow { color: var(--text-dim); font-size: 1.2rem; }
     .doc-meta { display: flex; align-items: center; gap: 0.8rem; margin-top: 0.2rem; }
@@ -123,6 +147,7 @@ export class ListComponent implements OnInit, OnDestroy {
   public signalR = inject(SignalRService);
 
   documents = signal<any[]>([]);
+  isOfflineMode = signal<boolean>(false);
   private destroy$ = new Subject<void>();
 
   ngOnInit() {
@@ -131,6 +156,7 @@ export class ListComponent implements OnInit, OnDestroy {
     // --- REAL-TIME UPDATES VIA SIGNALR ---
     merge(
       this.signalR.documentCreated$,
+      this.signalR.documentUpdated$,
       this.signalR.documentDeleted$,
       this.signalR.lockChanged$
     ).pipe(
@@ -142,14 +168,30 @@ export class ListComponent implements OnInit, OnDestroy {
   }
 
   loadList() {
-    this.storage.listDocuments().subscribe(docs => {
-      // Ensure camelCase mapping for the signal
-      const mappedDocs = docs.map((d: any) => ({
-        ...d,
-        isLocked: d.isLocked ?? d.IsLocked, // Handle potential casing issues
-        lockedBy: d.lockedBy ?? d.LockedBy
-      }));
-      this.documents.set(mappedDocs);
+    this.storage.listDocuments().subscribe({
+      next: (docs) => {
+        this.isOfflineMode.set(false);
+        // Merge with local drafts
+        const mappedDocs = docs.map((d: any) => {
+          const draft = this.storage.getLocalCache(d.id);
+          const hasDraft = !!draft;
+          
+          return {
+            ...d,
+            title: hasDraft ? draft.data.title : d.title, 
+            hasDraft: hasDraft,
+            isLocked: d.isLocked ?? d.IsLocked, 
+            lockedBy: d.lockedBy ?? d.LockedBy
+          };
+        });
+        this.documents.set(mappedDocs);
+      },
+      error: (err) => {
+        console.warn('[ListComponent] Server unreachable. Loading offline drafts...', err);
+        this.isOfflineMode.set(true);
+        const drafts = this.storage.getAllLocalDrafts();
+        this.documents.set(drafts);
+      }
     });
   }
 
@@ -182,9 +224,16 @@ export class ListComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           console.error('[ListComponent] Delete failed', err);
-          const msg = err.error?.message || 'Cannot delete: Document is locked by another user.';
+          let msg = 'Cannot delete: Document is locked by another user.';
+          
+          if (err.message === 'Network Error' || err.status === 0) {
+            msg = 'Cannot delete while offline. Please restore internet first.';
+          } else if (err.error?.message) {
+            msg = err.error.message;
+          }
+          
           alert(msg);
-          this.loadList(); // Refresh to catch latest lock status
+          this.loadList(); // Refresh to catch latest status
         }
       });
     }
