@@ -12,11 +12,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials()); // Required for SignalR
 });
 
-// 2. Add Swagger/OpenAPI services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// 3. Add SignalR
+// 2. Add SignalR
 builder.Services.AddSignalR();
 
 // Ensure the app listens on the port provided by the environment (e.g., Render/Azure)
@@ -24,13 +20,6 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "5202";
 builder.WebHost.UseUrls($"http://*:{port}");
 
 var app = builder.Build();
-
-// 4. Enable Swagger UI
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
 
 app.UseCors("AllowAll");
 
